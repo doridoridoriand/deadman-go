@@ -52,7 +52,7 @@ func TestPropertySchedulerConcurrencyLimit(t *testing.T) {
 				return true
 			}
 			pinger := &blockingPinger{started: make(chan struct{})}
-			store := state.NewStore(nil)
+			store := state.NewStore(nil, 5*time.Millisecond)
 			targets := make([]config.TargetConfig, targetCount)
 			for i := 0; i < targetCount; i++ {
 				targets[i] = config.TargetConfig{
@@ -105,7 +105,7 @@ func TestPropertySchedulerTargetsStart(t *testing.T) {
 				return true
 			}
 			pinger := &timestampPinger{times: make(map[string][]time.Time)}
-			store := state.NewStore(nil)
+			store := state.NewStore(nil, 2*time.Millisecond)
 			targets := make([]config.TargetConfig, targetCount)
 			for i := 0; i < targetCount; i++ {
 				addr := fmt.Sprintf("192.0.2.%d", i+1)
@@ -152,7 +152,7 @@ func TestPropertySchedulerIntervalRespected(t *testing.T) {
 			}
 			interval := time.Duration(intervalMs) * time.Millisecond
 			pinger := &timestampPinger{times: make(map[string][]time.Time)}
-			store := state.NewStore(nil)
+			store := state.NewStore(nil, 2*time.Millisecond)
 			target := config.TargetConfig{Name: "a", Address: "192.0.2.1"}
 
 			s := NewScheduler(config.GlobalOptions{
@@ -200,7 +200,7 @@ func TestPropertySchedulerStopsOnCancel(t *testing.T) {
 			}
 			interval := time.Duration(intervalMs) * time.Millisecond
 			pinger := &timestampPinger{times: make(map[string][]time.Time)}
-			store := state.NewStore(nil)
+			store := state.NewStore(nil, 2*time.Millisecond)
 			target := config.TargetConfig{Name: "a", Address: "192.0.2.1"}
 
 			s := NewScheduler(config.GlobalOptions{
