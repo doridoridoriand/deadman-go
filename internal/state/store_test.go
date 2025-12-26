@@ -11,7 +11,7 @@ import (
 func TestStoreUpdateResultSuccessAndFailure(t *testing.T) {
 	store := NewStore([]config.TargetConfig{
 		{Name: "example", Address: "192.0.2.1", Group: "group-1"},
-	})
+	}, 100*time.Millisecond)
 
 	store.UpdateResult("example", ping.Result{Success: false, Error: errSentinel{}})
 	status, ok := store.GetTargetStatus("example")
@@ -46,7 +46,7 @@ func TestStoreUpdateResultSuccessAndFailure(t *testing.T) {
 }
 
 func TestStoreHistorySize(t *testing.T) {
-	store := NewStore([]config.TargetConfig{{Name: "example"}})
+	store := NewStore([]config.TargetConfig{{Name: "example"}}, 100*time.Millisecond)
 	store.historySize = 2
 
 	store.UpdateResult("example", ping.Result{Success: true, RTT: 10 * time.Millisecond})
@@ -63,7 +63,7 @@ func TestStoreHistorySize(t *testing.T) {
 }
 
 func TestStoreUpdateTargetsKeepsHistory(t *testing.T) {
-	store := NewStore([]config.TargetConfig{{Name: "example", Address: "192.0.2.1"}})
+	store := NewStore([]config.TargetConfig{{Name: "example", Address: "192.0.2.1"}}, 100*time.Millisecond)
 	store.UpdateResult("example", ping.Result{Success: true, RTT: 10 * time.Millisecond})
 
 	store.UpdateTargets([]config.TargetConfig{
@@ -85,6 +85,34 @@ func TestStoreUpdateTargetsKeepsHistory(t *testing.T) {
 	_, ok = store.GetTargetStatus("new")
 	if !ok {
 		t.Fatalf("expected new target status")
+	}
+}
+
+func TestStoreUpdateResultRTTThresholds(t *testing.T) {
+	timeout := 100 * time.Millisecond
+	store := NewStore([]config.TargetConfig{
+		{Name: "example", Address: "192.0.2.1"},
+	}, timeout)
+
+	// OK: timeoutの25%以内（25ms以内）
+	store.UpdateResult("example", ping.Result{Success: true, RTT: 20 * time.Millisecond})
+	status, _ := store.GetTargetStatus("example")
+	if status.Status != StatusOK {
+		t.Fatalf("expected OK for RTT 20ms (within 25%% of 100ms), got %s", status.Status)
+	}
+
+	// WARN: timeoutの25%超、50%以内（25ms超、50ms以内）
+	store.UpdateResult("example", ping.Result{Success: true, RTT: 40 * time.Millisecond})
+	status, _ = store.GetTargetStatus("example")
+	if status.Status != StatusWarn {
+		t.Fatalf("expected WARN for RTT 40ms (between 25%% and 50%% of 100ms), got %s", status.Status)
+	}
+
+	// WARN: timeoutの50%超（50ms超）
+	store.UpdateResult("example", ping.Result{Success: true, RTT: 80 * time.Millisecond})
+	status, _ = store.GetTargetStatus("example")
+	if status.Status != StatusWarn {
+		t.Fatalf("expected WARN for RTT 80ms (over 50%% of 100ms), got %s", status.Status)
 	}
 }
 

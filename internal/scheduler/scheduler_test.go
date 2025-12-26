@@ -14,7 +14,7 @@ import (
 
 func TestSchedulerMaxConcurrency(t *testing.T) {
 	pinger := &blockingPinger{started: make(chan struct{})}
-	store := state.NewStore(nil)
+	store := state.NewStore(nil, 5*time.Millisecond)
 	targets := []config.TargetConfig{
 		{Name: "a", Address: "192.0.2.1"},
 		{Name: "b", Address: "192.0.2.2"},
@@ -46,7 +46,7 @@ func TestSchedulerMaxConcurrency(t *testing.T) {
 
 func TestSchedulerUpdateConfigStartsNewTarget(t *testing.T) {
 	recorder := &recordingPinger{seen: make(map[string]int)}
-	store := state.NewStore(nil)
+	store := state.NewStore(nil, 2*time.Millisecond)
 
 	initial := []config.TargetConfig{{Name: "a", Address: "192.0.2.1"}}
 	s := NewScheduler(config.GlobalOptions{
@@ -75,6 +75,7 @@ type blockingPinger struct {
 	inFlight int32
 	max      int32
 	started  chan struct{}
+	once     sync.Once
 }
 
 func (p *blockingPinger) Ping(ctx context.Context, addr string, timeout time.Duration) ping.Result {
@@ -91,11 +92,9 @@ func (p *blockingPinger) Ping(ctx context.Context, addr string, timeout time.Dur
 		}
 	}
 
-	select {
-	case <-p.started:
-	default:
+	p.once.Do(func() {
 		close(p.started)
-	}
+	})
 
 	<-ctx.Done()
 	return ping.Result{Success: false, Error: ctx.Err()}

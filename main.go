@@ -1,12 +1,23 @@
 package main
 
 import (
+	"context"
+	"errors"
 	"flag"
 	"fmt"
 	"os"
+	"os/signal"
+	"sort"
+	"sync"
+	"syscall"
+	"time"
 
 	"github.com/doridoridoriand/deadman-go/internal/cli"
 	"github.com/doridoridoriand/deadman-go/internal/config"
+	"github.com/doridoridoriand/deadman-go/internal/ping"
+	"github.com/doridoridoriand/deadman-go/internal/scheduler"
+	"github.com/doridoridoriand/deadman-go/internal/state"
+	"github.com/doridoridoriand/deadman-go/internal/ui"
 )
 
 const version = "0.1.0"
@@ -63,7 +74,45 @@ func main() {
 		os.Exit(1)
 	}
 
-	fmt.Fprintf(os.Stdout, "loaded %d targets\n", len(cfg.Targets))
+	icmpPinger, err := ping.NewICMPPinger()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "failed to initialize pinger: %v\n", err)
+		os.Exit(1)
+	}
+	pinger := ping.NewFallbackPinger(icmpPinger, ping.NewExternalPinger())
+
+	store := state.NewStore(cfg.Targets, cfg.Global.Timeout)
+	sched := scheduler.NewScheduler(cfg.Global, cfg.Targets, pinger, store)
+
+	ctx, cancel := signalContext()
+	defer cancel()
+
+	var wg sync.WaitGroup
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		if err := sched.Run(ctx); err != nil && !errors.Is(err, context.Canceled) {
+			fmt.Fprintf(os.Stderr, "scheduler error: %v\n", err)
+			cancel()
+		}
+	}()
+
+	if cfg.Global.UIDisable {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			runTextReporter(ctx, store)
+		}()
+		<-ctx.Done()
+	} else {
+		ui := ui.New(cfg.Global, store)
+		if err := ui.Run(ctx); err != nil && !errors.Is(err, context.Canceled) {
+			fmt.Fprintf(os.Stderr, "ui error: %v\n", err)
+			cancel()
+		}
+	}
+
+	wg.Wait()
 }
 
 func buildOverrides(
@@ -102,4 +151,48 @@ func buildOverrides(
 	}
 
 	return overrides
+}
+
+func signalContext() (context.Context, context.CancelFunc) {
+	ctx, cancel := context.WithCancel(context.Background())
+	ch := make(chan os.Signal, 1)
+	signal.Notify(ch, os.Interrupt, syscall.SIGTERM)
+	go func() {
+		<-ch
+		cancel()
+	}()
+	return ctx, cancel
+}
+
+func runTextReporter(ctx context.Context, store state.Store) {
+	ticker := time.NewTicker(1 * time.Second)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			snapshot := store.GetSnapshot()
+			if len(snapshot) == 0 {
+				continue
+			}
+			sort.Slice(snapshot, func(i, j int) bool {
+				return snapshot[i].Name < snapshot[j].Name
+			})
+			fmt.Fprintf(os.Stdout, "[%s] targets=%d\n", time.Now().Format(time.RFC3339), len(snapshot))
+			for _, target := range snapshot {
+				fmt.Fprintf(
+					os.Stdout,
+					"- %s (%s) status=%s rtt=%s ok=%d ng=%d\n",
+					target.Name,
+					target.Address,
+					target.Status,
+					target.LastRTT,
+					target.ConsecutiveOK,
+					target.ConsecutiveNG,
+				)
+			}
+		}
+	}
 }
