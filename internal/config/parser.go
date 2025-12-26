@@ -58,9 +58,13 @@ func (p DeadmanParser) LoadConfig(path string, overrides CLIOverrides) (*Config,
 			continue
 		}
 
-		if line == "---" {
+		if strings.HasPrefix(line, "---") {
 			groupIndex++
-			currentGroup = fmt.Sprintf("group-%d", groupIndex)
+			groupName := strings.TrimSpace(strings.TrimPrefix(line, "---"))
+			if groupName == "" {
+				groupName = fmt.Sprintf("group-%d", groupIndex)
+			}
+			currentGroup = groupName
 			continue
 		}
 
