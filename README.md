@@ -33,7 +33,7 @@ CLI options override config values:
 
 ```sh
 ./bin/deadman-go \
-  -interval 5s \
+  -interval 1s \
   -timeout 500ms \
   -max-concurrency 10 \
   -metrics-mode per-target \

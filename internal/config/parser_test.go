@@ -61,6 +61,27 @@ func TestLoadConfigParsesTargetsAndGroups(t *testing.T) {
 	}
 }
 
+func TestLoadConfigParsesNamedGroup(t *testing.T) {
+	configText := "" +
+		"resolver 8.8.8.8\n" +
+		"--- DNS\n" +
+		"public 1.1.1.1\n"
+
+	path := writeTempConfig(t, configText)
+	parser := DeadmanParser{}
+
+	cfg, err := parser.LoadConfig(path, CLIOverrides{})
+	if err != nil {
+		t.Fatalf("LoadConfig error: %v", err)
+	}
+	if len(cfg.Targets) != 2 {
+		t.Fatalf("expected 2 targets, got %d", len(cfg.Targets))
+	}
+	if cfg.Targets[1].Group != "DNS" {
+		t.Fatalf("expected group DNS, got %q", cfg.Targets[1].Group)
+	}
+}
+
 func TestLoadConfigIgnoresComments(t *testing.T) {
 	configText := "" +
 		"# normal comment\n" +
