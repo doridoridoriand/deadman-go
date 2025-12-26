@@ -19,14 +19,16 @@ type StoreImpl struct {
 	targets       map[string]*TargetStatus
 	historySize   int
 	downThreshold int
+	timeout       time.Duration
 }
 
 // NewStore creates a store initialized with the provided targets.
-func NewStore(targets []config.TargetConfig) *StoreImpl {
+func NewStore(targets []config.TargetConfig, timeout time.Duration) *StoreImpl {
 	store := &StoreImpl{
 		targets:       make(map[string]*TargetStatus),
 		historySize:   defaultHistorySize,
 		downThreshold: defaultDownThreshold,
+		timeout:       timeout,
 	}
 	store.UpdateTargets(targets)
 	return store
@@ -49,7 +51,20 @@ func (s *StoreImpl) UpdateResult(name string, result ping.Result) {
 		target.LastSuccessAt = now
 		target.ConsecutiveOK++
 		target.ConsecutiveNG = 0
-		target.Status = StatusOK
+		// RTTに基づいてOK/WARNを判定
+		// OK: timeoutの25%以内
+		// WARN: timeoutの25%超、50%以内
+		// timeoutの50%超もWARNとして扱う
+		okThreshold := s.timeout / 4      // 25%
+		warnThreshold := s.timeout / 2    // 50%
+		if result.RTT <= okThreshold {
+			target.Status = StatusOK
+		} else if result.RTT <= warnThreshold {
+			target.Status = StatusWarn
+		} else {
+			// timeoutの50%超もWARNとして扱う
+			target.Status = StatusWarn
+		}
 		s.appendHistory(target, result.RTT, now)
 		return
 	}
