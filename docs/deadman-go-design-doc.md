@@ -539,6 +539,20 @@ type StateStore struct {
 - `GetSnapshot() []TargetStatus`
 - `UpdateTargets([]TargetConfig)`（リロード時）
 
+#### ステータス判定ロジック
+
+ステータスは以下のルールに基づいて判定される：
+
+1. **OK**: pingが成功し、RTTが`timeout`で指定されている値の25%以内の場合
+   - 例: `timeout=100ms`の場合、RTTが25ms以内ならOK
+2. **WARN**: 以下のいずれかの場合
+   - pingが成功し、RTTが`timeout`の25%超、50%以内の場合
+   - pingが成功し、RTTが`timeout`の50%超の場合
+   - pingが失敗した場合（連続失敗回数が`downThreshold`未満の場合）
+   - 例: `timeout=100ms`の場合、RTTが25ms超、50ms以内ならWARN
+3. **DOWN**: pingが失敗し、連続失敗回数が`downThreshold`（デフォルト: 3回）以上の場合
+4. **UNKNOWN**: ターゲットが初期化された直後、まだpingが実行されていない場合
+
 ### 9.3 Scheduler
 
 ```go
