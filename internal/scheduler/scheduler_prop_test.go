@@ -2,6 +2,7 @@ package scheduler
 
 import (
 	"context"
+	"fmt"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -56,7 +57,7 @@ func TestPropertySchedulerConcurrencyLimit(t *testing.T) {
 			for i := 0; i < targetCount; i++ {
 				targets[i] = config.TargetConfig{
 					Name:    string(rune('a' + i)),
-					Address: "192.0.2." + string(rune('1'+i)),
+					Address: fmt.Sprintf("192.0.2.%d", i+1),
 				}
 			}
 			s := NewScheduler(config.GlobalOptions{
@@ -107,7 +108,7 @@ func TestPropertySchedulerTargetsStart(t *testing.T) {
 			store := state.NewStore(nil, 2*time.Millisecond)
 			targets := make([]config.TargetConfig, targetCount)
 			for i := 0; i < targetCount; i++ {
-				addr := "192.0.2." + string(rune('1'+i))
+				addr := fmt.Sprintf("192.0.2.%d", i+1)
 				targets[i] = config.TargetConfig{Name: addr, Address: addr}
 			}
 
