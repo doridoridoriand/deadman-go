@@ -180,12 +180,12 @@ func (u *UI) formatTargetLine(width int, target state.TargetStatus) []styledRune
 	name := padOrTrim(target.Name, minInt(14, width))
 	addr := padOrTrim(target.Address, minInt(18, width))
 	status := padOrTrim(string(target.Status), 6)
-	
+
 	// 平均RTTを計算
 	avgRTT := calculateAvgRTT(target)
 	rttLabel := "RTT:"
 	rtt := padOrTrim(fmt.Sprintf("%s%s", rttLabel, formatRTT(avgRTT)), 12)
-	
+
 	// LOSS率を計算して表示
 	lossPercent := calculateLossPercent(target)
 	loss := padOrTrim(fmt.Sprintf("LOSS:%.1f%%", lossPercent), 12)
