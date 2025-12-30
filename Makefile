@@ -40,7 +40,7 @@ install: build
 
 clean:
 	@rm -rf $(BIN_DIR)
-	go clean -cache
+	go clean -cache -testcache -modcache
 
 clean-build: clean build
 
