@@ -1,8 +1,11 @@
 package cli
 
 import (
+	"fmt"
 	"strconv"
 	"time"
+
+	"github.com/doridoridoriand/surveiller/internal/config"
 )
 
 // OptionalDuration records a duration flag and whether it was set.
@@ -113,5 +116,34 @@ func (o *OptionalBool) IsBoolFlag() bool {
 }
 
 func (o *OptionalBool) Value() (bool, bool) {
+	return o.value, o.set
+}
+
+// OptionalMetricsMode records a MetricsMode flag and whether it was set.
+type OptionalMetricsMode struct {
+	value config.MetricsMode
+	set   bool
+}
+
+func (o *OptionalMetricsMode) Set(s string) error {
+	mode := config.MetricsMode(s)
+	switch mode {
+	case config.MetricsModePerTarget, config.MetricsModeAggregated, config.MetricsModeBoth:
+		o.value = mode
+		o.set = true
+		return nil
+	default:
+		return fmt.Errorf("invalid metrics mode: %q (valid values: per-target, aggregated, both)", s)
+	}
+}
+
+func (o *OptionalMetricsMode) String() string {
+	if !o.set {
+		return ""
+	}
+	return string(o.value)
+}
+
+func (o *OptionalMetricsMode) Value() (config.MetricsMode, bool) {
 	return o.value, o.set
 }
